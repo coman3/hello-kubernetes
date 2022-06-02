@@ -1,0 +1,114 @@
+---
+# Source: hello-kubernetes/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hello-kubernetes-k8s-session
+  labels:
+    app.kubernetes.io/name: hello-kubernetes
+    app.kubernetes.io/instance: k8s-session
+    app.kubernetes.io/version: "1.10"
+---
+# Source: hello-kubernetes/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-kubernetes-k8s-session
+  labels:
+    app.kubernetes.io/name: hello-kubernetes
+    app.kubernetes.io/instance: k8s-session
+    app.kubernetes.io/version: "1.10"
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: hello-kubernetes
+    app.kubernetes.io/instance: k8s-session
+---
+# Source: hello-kubernetes/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-kubernetes-k8s-session
+  labels:
+    app.kubernetes.io/name: hello-kubernetes
+    app.kubernetes.io/instance: k8s-session
+    app.kubernetes.io/version: "1.10"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hello-kubernetes
+      app.kubernetes.io/instance: k8s-session
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hello-kubernetes
+        app.kubernetes.io/instance: k8s-session
+    spec:
+      serviceAccountName: hello-kubernetes-k8s-session
+      containers:
+        - name: hello-kubernetes
+          image: "paulbouwer/hello-kubernetes:1.10"
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          env:
+          - name: MESSAGE
+            value: "Hello from raw k8s configuration!"
+          - name: KUBERNETES_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: KUBERNETES_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: KUBERNETES_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: CONTAINER_IMAGE
+            value: "paulbouwer/hello-kubernetes:1.10"
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        kubernetes.io/os: linux
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hello-kubernetes-k8s-session
+  labels:
+    app.kubernetes.io/name: hello-kubernetes
+    app.kubernetes.io/instance: k8s-session
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: hello-kubernetes-k8s-session
+            port:
+              number: 80
